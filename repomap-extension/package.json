@@ -1,0 +1,51 @@
+{
+  "name": "repomap-extension",
+  "displayName": "RepoMap",
+  "description": "Live view of RepoMap MCP tool calls — blast radius, dependency paths, risk scores",
+  "version": "0.1.0",
+  "publisher": "repomap",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Visualization"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "repomap",
+          "title": "RepoMap",
+          "icon": "$(graph)"
+        }
+      ]
+    },
+    "views": {
+      "repomap": [
+        {
+          "id": "repomap.liveView",
+          "name": "Live View",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "repomap.focusSidebar",
+        "title": "RepoMap: Focus Sidebar"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run build && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.3.0"
+  }
+}
