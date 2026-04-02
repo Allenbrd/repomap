@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 
 import networkx as nx
 
+from .config import POLICY_ZONE_KEYWORDS
 from .parser import parse_directory
 from .policy import PolicyViolation, apply_zones_to_graph, detect_violations
 
@@ -200,16 +202,38 @@ class RepoGraph:
             )
 
     def get_domain_context(self, concept: str) -> DomainContextResult:
-        """Find files related to a domain concept via name/export matching."""
+        """Find files related to a domain concept via name/export matching.
+
+        If the concept matches a policy zone name, all keywords for that zone
+        are used for matching (e.g. "billing" also matches "payment", "stripe",
+        "checkout", "subscription", etc.).
+        """
         concept_lower = concept.lower()
+
+        # Build search terms: the concept itself + any policy zone synonyms
+        search_terms = [concept_lower]
+        for zone, keywords in POLICY_ZONE_KEYWORDS.items():
+            if concept_lower in keywords or concept_lower == zone:
+                for kw in keywords:
+                    if kw not in search_terms:
+                        search_terms.append(kw)
+
         matching: list[str] = []
 
+        # Path matching: expanded keywords with word boundaries
+        # Use a custom boundary that treats - _ / . as separators (unlike \b which treats _ as \w)
+        sep = r"(?<![a-zA-Z0-9])"
+        end = r"(?![a-zA-Z0-9])"
+        path_pattern = re.compile(
+            "|".join(rf"{sep}{re.escape(t)}{end}" for t in search_terms)
+        )
+
         for node in self.graph.nodes():
-            # Check filename
-            if concept_lower in node.lower():
+            node_lower = node.lower()
+            if path_pattern.search(node_lower):
                 matching.append(node)
                 continue
-            # Check exports
+            # Export matching: direct concept only (no expansion)
             exports = self.graph.nodes[node].get("exports", [])
             if any(concept_lower in exp.lower() for exp in exports):
                 matching.append(node)

@@ -55,10 +55,32 @@ def test_repo_overview_single_node():
 
 
 def test_domain_context_matches_on_export(graph):
-    """get_domain_context matches on export name, not just filename."""
+    """get_domain_context matches on direct concept in export name."""
     result = graph.get_domain_context("processCharge")
     assert len(result.matching_files) > 0
     assert any("billing_service" in f for f in result.matching_files)
+
+
+def test_domain_context_path_word_boundary():
+    """Path matching uses word boundaries — 'charge' matches 'charge' but not 'recharge'."""
+    g = RepoGraph("/tmp/fake")
+    g.graph.add_node("src/charge/handler.ts", language="typescript", exports=[], policy_zones=[])
+    g.graph.add_node("src/recharge/handler.ts", language="typescript", exports=[], policy_zones=[])
+    result = g.get_domain_context("charge")
+    assert "src/charge/handler.ts" in result.matching_files
+    assert "src/recharge/handler.ts" not in result.matching_files
+
+
+def test_domain_context_expanded_keyword_export_no_match():
+    """Expanded keywords only apply to paths, not exports — prevents false positives."""
+    g = RepoGraph("/tmp/fake")
+    # scraper exports formatPrice; "price" is an expanded keyword for "billing"
+    g.graph.add_node("src/scraper-utils.ts", language="typescript", exports=["formatPrice"], policy_zones=[])
+    # billing_service has "billing" in its path — should match
+    g.graph.add_node("src/billing/service.ts", language="typescript", exports=["processCharge"], policy_zones=[])
+    result = g.get_domain_context("billing")
+    assert "src/billing/service.ts" in result.matching_files
+    assert "src/scraper-utils.ts" not in result.matching_files
 
 
 def test_resolve_filepath_as_is_match(graph):

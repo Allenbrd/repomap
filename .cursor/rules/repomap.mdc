@@ -1,0 +1,22 @@
+---
+description: Use repomap MCP tools for codebase analysis
+globs:
+alwaysApply: true
+---
+
+You have access to a "repomap" MCP server with 5 tools for codebase intelligence. Prefer these over grep/find for structural code questions:
+
+- **analyze_blast_radius** — Before modifying a file, check what other files depend on it and what policy zones (billing, auth, PII, infrastructure) it touches.
+- **find_dependency_path** — Find the shortest import chain between two files.
+- **get_domain_context** — Find all files related to a concept (e.g. "billing", "auth", "checkout") by filename and export matching, plus their dependency relationships.
+- **get_repo_overview** — Get a high-level summary: languages, most-connected files, risk hotspots, policy zones.
+- **get_file_info** — Get a file's imports, importers, exports, policy zones, and centrality.
+
+All tools require a `repo_path` parameter — use the absolute path to the current project root.
+
+Use these tools when the user asks about:
+- What files are related to a concept/feature
+- What would break if a file changes
+- How two files are connected
+- Repo architecture overview
+- File role/dependencies

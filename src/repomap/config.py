@@ -28,6 +28,7 @@ POLICY_ZONE_KEYWORDS: dict[str, list[str]] = {
     "billing": [
         "billing", "payment", "stripe", "invoice", "checkout",
         "subscription", "charge", "price", "revenue",
+        "pricing", "plan", "trial", "paid", "setup-intent",
     ],
     "auth": [
         "auth", "login", "session", "token", "permission",
