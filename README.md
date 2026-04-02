@@ -1,3 +1,6 @@
+<img width="1511" height="879" alt="image" src="https://github.com/user-attachments/assets/fed10cd9-9f46-46a5-aeee-d7e7caf6359f" />
+
+
 # RepoMap
 
 Deterministic codebase intelligence for AI coding agents. An MCP server that replaces probabilistic grep with AST-backed graph math.
