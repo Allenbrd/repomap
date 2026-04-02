@@ -93,7 +93,7 @@ function wrapMcpConfig(proxyPath: string, log: vscode.OutputChannel): void {
         continue;
       }
 
-      const origCommand = entry.command;
+      const origCommand = resolvePython(entry.command, entry.cwd, log);
       const origArgs: string[] = entry.args ?? [];
 
       entry.command = "node";
@@ -105,6 +105,43 @@ function wrapMcpConfig(proxyPath: string, log: vscode.OutputChannel): void {
       log.appendLine(`[repomap] could not wrap ${mcpPath}: ${err}`);
     }
   }
+}
+
+/**
+ * If the original command is "python", try to resolve it to a working path:
+ *   1. <cwd>/.venv/bin/python  (project venv)
+ *   2. python3                  (macOS / homebrew)
+ *   3. original value           (fallback)
+ */
+function resolvePython(command: string, cwd: string | undefined, log: vscode.OutputChannel): string {
+  if (command !== "python") return command;
+
+  if (cwd) {
+    const venvPy = path.join(cwd, ".venv", "bin", "python");
+    if (fs.existsSync(venvPy)) {
+      log.appendLine(`[repomap] resolved python → ${venvPy}`);
+      return venvPy;
+    }
+  }
+
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const venvPy = path.join(folder.uri.fsPath, ".venv", "bin", "python");
+    if (fs.existsSync(venvPy)) {
+      log.appendLine(`[repomap] resolved python → ${venvPy}`);
+      return venvPy;
+    }
+  }
+
+  try {
+    const { execFileSync } = require("child_process");
+    const p3 = execFileSync("which", ["python3"], { encoding: "utf-8" }).trim();
+    if (p3) {
+      log.appendLine(`[repomap] resolved python → python3 (${p3})`);
+      return "python3";
+    }
+  } catch { /* python3 not on PATH */ }
+
+  return command;
 }
 
 function isAlreadyWrapped(entry: McpServerEntry, proxyPath: string): boolean {
