@@ -105,9 +105,16 @@ export class GraphPanelProvider {
 
       this.log.appendLine(`[graph] fetching graph: ${pythonPath} ${scriptPath} ${repoPath}`);
 
+      const repomapRoot = this.findRepomapRoot();
+      const env = { ...process.env };
+      if (repomapRoot) {
+        env.PYTHONPATH = path.join(repomapRoot, "src") + (env.PYTHONPATH ? ":" + env.PYTHONPATH : "");
+      }
+
       execFile(pythonPath, [scriptPath, repoPath], {
         timeout: 30_000,
         maxBuffer: 10 * 1024 * 1024,
+        env,
       }, (err, stdout, stderr) => {
         if (err) {
           this.log.appendLine(`[graph] export error: ${err.message}`);
