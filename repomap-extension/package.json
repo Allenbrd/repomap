@@ -33,6 +33,10 @@
       {
         "command": "repomap.focusSidebar",
         "title": "RepoMap: Focus Sidebar"
+      },
+      {
+        "command": "repomap.openGraph",
+        "title": "RepoMap: Open Graph View"
       }
     ]
   },

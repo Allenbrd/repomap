@@ -26,6 +26,29 @@ export interface RepomapEvent {
   violations: PolicyViolation[];
   mermaid_source: string;
   error?: string;
+  direct_dependents: string[];
+  transitive_dependents: string[];
+  path_files: string[];
+  context_files: string[];
+  matching_files: string[];
+}
+
+export interface GraphNode {
+  id: string;
+  language: string;
+  policy_zones: string[];
+  exports: string[];
+  connection_count: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }
 
 export function riskLevelFromScore(score: number): RiskLevel {

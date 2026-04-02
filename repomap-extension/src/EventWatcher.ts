@@ -127,6 +127,11 @@ export class EventWatcher extends EventEmitter {
         reasoning: "",
         violations: [],
         mermaid_source: "",
+        direct_dependents: [],
+        transitive_dependents: [],
+        path_files: [],
+        context_files: [],
+        matching_files: [],
       };
       this.emit("event", running);
       return;
@@ -165,6 +170,11 @@ export class EventWatcher extends EventEmitter {
         violations: [],
         mermaid_source: "",
         error: ev.error,
+        direct_dependents: [],
+        transitive_dependents: [],
+        path_files: [],
+        context_files: [],
+        matching_files: [],
       };
       this.emit("event", errEvent);
     }
@@ -181,6 +191,11 @@ function parseMarkdownResult(text: string): {
   reasoning: string;
   violations: PolicyViolation[];
   mermaid_source: string;
+  direct_dependents: string[];
+  transitive_dependents: string[];
+  path_files: string[];
+  context_files: string[];
+  matching_files: string[];
 } {
   const scoreMatch = text.match(/\*\*Risk Score:\s*([\d.]+)\s*\((\w+)\)\*\*/);
   const riskScore = scoreMatch ? parseFloat(scoreMatch[1]) : 0;
@@ -228,5 +243,40 @@ function parseMarkdownResult(text: string): {
     reasoning += " — safe to modify";
   }
 
-  return { risk_score: riskScore, risk_level: riskLevel, reasoning: reasoning.trim(), violations, mermaid_source: mermaidSource };
+  const direct_dependents = extractBulletList(text, /### Direct Dependents/);
+  const transitive_dependents = extractBulletList(text, /### Transitive Dependents/).map(
+    (line) => line.split(/\s*->\s*/)[0].trim()
+  );
+
+  let path_files: string[] = [];
+  const pathChainMatch = text.match(/\*\*Chain:\*\*\s*(.+)/);
+  if (pathChainMatch) {
+    path_files = pathChainMatch[1].split(/\s*->\s*/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  const matching_files = extractBulletList(text, /\*\*Matching files/);
+  const related = extractBulletList(text, /\*\*Related files/);
+  const context_files = [...matching_files, ...related];
+
+  return {
+    risk_score: riskScore, risk_level: riskLevel, reasoning: reasoning.trim(),
+    violations, mermaid_source: mermaidSource,
+    direct_dependents, transitive_dependents, path_files, context_files, matching_files,
+  };
+}
+
+function extractBulletList(text: string, headerRe: RegExp): string[] {
+  const lines = text.split("\n");
+  const idx = lines.findIndex((l) => headerRe.test(l));
+  if (idx === -1) return [];
+  const result: string[] = [];
+  for (let i = idx + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith("- ")) {
+      result.push(line.slice(2).trim());
+    } else if (line.startsWith("#") || line.startsWith("**") || line === "") {
+      if (result.length > 0) break;
+    }
+  }
+  return result;
 }

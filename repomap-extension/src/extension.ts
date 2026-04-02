@@ -3,10 +3,12 @@ import * as fs from "fs";
 import * as path from "path";
 import { EventWatcher } from "./EventWatcher";
 import { LiveViewProvider } from "./LiveViewProvider";
+import { GraphPanelProvider } from "./GraphPanelProvider";
 import { RepomapEvent } from "./types";
 
 let watcher: EventWatcher | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
+let graphPanel: GraphPanelProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const log = vscode.window.createOutputChannel("RepoMap");
@@ -33,7 +35,11 @@ export function activate(context: vscode.ExtensionContext): void {
   watcher.on("event", (ev: RepomapEvent) => {
     log.appendLine(`[repomap] ${ev.status}: ${ev.tool} (id=${ev.id})`);
     provider.pushEvent(ev);
+    graphPanel?.sendEvent(ev);
     refreshStatusBar(ev);
+    if (ev.status !== "running") {
+      graphPanel?.sendConnectionStatus("connected");
+    }
   });
 
   context.subscriptions.push({ dispose: () => watcher?.stop() });
@@ -46,6 +52,10 @@ export function activate(context: vscode.ExtensionContext): void {
   statusItem.show();
   context.subscriptions.push(statusItem);
 
+  // --- Graph panel ---
+  graphPanel = new GraphPanelProvider(context.extensionUri, log);
+  context.subscriptions.push({ dispose: () => graphPanel?.dispose() });
+
   // --- Commands ---
   context.subscriptions.push(
     vscode.commands.registerCommand("repomap.focusSidebar", () => {
@@ -53,12 +63,22 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  context.subscriptions.push(
+    vscode.commands.registerCommand("repomap.openGraph", () => {
+      graphPanel?.openOrReveal();
+    })
+  );
+
+  // Auto-open graph panel on activation
+  setTimeout(() => graphPanel?.openOrReveal(), 1500);
+
   log.appendLine("[repomap] activated — proxy.js at " + proxyPath);
   log.appendLine("[repomap] watching ~/.repomap/events.jsonl");
 }
 
 export function deactivate(): void {
   watcher?.stop();
+  graphPanel?.dispose();
 }
 
 /**
