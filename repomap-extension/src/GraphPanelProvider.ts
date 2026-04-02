@@ -48,6 +48,9 @@ export class GraphPanelProvider {
           vscode.window.showTextDocument(uri, { preview: true });
         }
       }
+      if (msg.type === "runTool") {
+        this.runToolPython(msg.tool, msg.toolArgs);
+      }
     });
 
     this.panel.onDidDispose(() => {
@@ -157,6 +160,85 @@ export class GraphPanelProvider {
     if (fs.existsSync(path.join(candidate, "pyproject.toml"))) return candidate;
 
     return undefined;
+  }
+
+  private runToolPython(tool: string, toolArgs: string[]): void {
+    const ws = vscode.workspace.workspaceFolders?.[0];
+    if (!ws) return;
+
+    const repoPath = ws.uri.fsPath;
+    const scriptPath = path.join(this.extensionUri.fsPath, "run_tool.py");
+    const pythonPath = this.findPython(repoPath);
+
+    const repomapRoot = this.findRepomapRoot();
+    const env = { ...process.env };
+    if (repomapRoot) {
+      env.PYTHONPATH = path.join(repomapRoot, "src") + (env.PYTHONPATH ? ":" + env.PYTHONPATH : "");
+    }
+
+    const args = [scriptPath, tool, repoPath, ...toolArgs];
+    this.log.appendLine(`[graph] runTool: ${pythonPath} ${args.join(" ")}`);
+
+    const eventId = Date.now();
+
+    const startedEvent: RepomapEvent = {
+      id: eventId,
+      tool,
+      status: "running",
+      timestamp: new Date().toISOString(),
+      args: this.buildArgsMap(tool, repoPath, toolArgs),
+      risk_score: 0, risk_level: "LOW", reasoning: "", violations: [],
+      mermaid_source: "", direct_dependents: [], transitive_dependents: [],
+      path_files: [], context_files: [], matching_files: [],
+    };
+    this.post({ type: "event", event: startedEvent });
+
+    execFile(pythonPath, args, { timeout: 30_000, maxBuffer: 10 * 1024 * 1024, env },
+      (err, stdout, stderr) => {
+        if (err) {
+          this.log.appendLine(`[graph] runTool error: ${err.message}`);
+          if (stderr) this.log.appendLine(`[graph] stderr: ${stderr}`);
+          const errEv: RepomapEvent = {
+            ...startedEvent, status: "error", error: err.message,
+            timestamp: new Date().toISOString(),
+          };
+          this.post({ type: "event", event: errEv });
+          return;
+        }
+        try {
+          const result = JSON.parse(stdout);
+          const completedEvent: RepomapEvent = {
+            id: eventId,
+            tool,
+            status: "completed",
+            timestamp: new Date().toISOString(),
+            args: this.buildArgsMap(tool, repoPath, toolArgs),
+            risk_score: result.risk_score ?? 0,
+            risk_level: result.risk_level ?? "LOW",
+            reasoning: result.reasoning ?? "",
+            violations: result.violations ?? [],
+            mermaid_source: "",
+            direct_dependents: result.direct_dependents ?? [],
+            transitive_dependents: result.transitive_dependents ?? [],
+            path_files: result.path_files ?? [],
+            context_files: result.context_files ?? [],
+            matching_files: result.matching_files ?? [],
+          };
+          this.log.appendLine(`[graph] runTool result: ${completedEvent.reasoning}`);
+          this.post({ type: "event", event: completedEvent });
+        } catch (e) {
+          this.log.appendLine(`[graph] runTool parse error: ${e}`);
+        }
+      }
+    );
+  }
+
+  private buildArgsMap(tool: string, repoPath: string, toolArgs: string[]): Record<string, string> {
+    const m: Record<string, string> = { repo_path: repoPath };
+    if (tool === "analyze_blast_radius" && toolArgs[0]) m.file_path = toolArgs[0];
+    if (tool === "find_dependency_path") { m.start_file = toolArgs[0] || ""; m.end_file = toolArgs[1] || ""; }
+    if (tool === "get_domain_context" && toolArgs[0]) m.concept = toolArgs[0];
+    return m;
   }
 
   private getHtml(): string {
